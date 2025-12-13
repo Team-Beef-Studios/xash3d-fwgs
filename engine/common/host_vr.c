@@ -871,6 +871,7 @@ void Host_VRMotionControls( bool zoomed, bool superzoomed, bool motionActive, ve
 			(strcmp(weapon, "models/v_awp.mdl") == 0) ||
 			(strcmp(weapon, "models/v_g3sg1.mdl") == 0) ||
 			(strcmp(weapon, "models/v_scout.mdl") == 0) ||
+			(strcmp(weapon, "models/v_sg550.mdl") == 0) ||
 			(strcmp(weapon, "models/v_sg552.mdl") == 0)) {
 		if (strcmp(weapon, lastWeapon) != 0) {
 			Cvar_SetValue("vr_zoom_by_motion", 0);
