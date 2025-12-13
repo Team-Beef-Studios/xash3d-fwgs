@@ -33,6 +33,7 @@ CVAR_DEFINE_AUTO( vr_camera_y, "0", FCVAR_MOVEVARS, "Offset y of the camera" );
 CVAR_DEFINE_AUTO( vr_camera_z, "0", FCVAR_MOVEVARS, "Offset z of the camera" );
 CVAR_DEFINE_AUTO( vr_force2d, "0", FCVAR_MOVEVARS, "Is the client forcing 2D UI mode?" );
 CVAR_DEFINE_AUTO( vr_gamemode, "0", FCVAR_MOVEVARS, "Are we in the 3D VR mode?" );
+CVAR_DEFINE_AUTO( vr_hand_active, "0", FCVAR_MOVEVARS, "Hand action active" );
 CVAR_DEFINE_AUTO( vr_hand_click, "0", FCVAR_MOVEVARS, "Hand aiming click" );
 CVAR_DEFINE_AUTO( vr_hand_stretch, "0", FCVAR_MOVEVARS, "Hand aiming with arm stretch" );
 CVAR_DEFINE_AUTO( vr_hand_x, "0", FCVAR_MOVEVARS, "Hand position x" );
@@ -83,6 +84,7 @@ CVAR_DEFINE_AUTO( vr_xhair_x, "0", FCVAR_MOVEVARS, "Cross-hair 2d position x" );
 CVAR_DEFINE_AUTO( vr_xhair_y, "0", FCVAR_MOVEVARS, "Cross-hair 2d position y" );
 CVAR_DEFINE_AUTO( vr_superzoomed, "0", FCVAR_MOVEVARS, "Flag if the scene super zoomed" );
 CVAR_DEFINE_AUTO( vr_zoomed, "0", FCVAR_MOVEVARS, "Flag if the scene zoomed" );
+CVAR_DEFINE_AUTO( vr_zoomfix, "0", FCVAR_MOVEVARS, "Flag that zoom has to be adjusted" );
 CVAR_DEFINE_AUTO( vr_zoom_by_motion, "0", FCVAR_MOVEVARS, "Flag if the scene zoomed by motion" );
 
 
@@ -144,6 +146,7 @@ void Host_VRInit( void )
 	Cvar_RegisterVariable( &vr_camera_z );
 	Cvar_RegisterVariable( &vr_force2d );
 	Cvar_RegisterVariable( &vr_gamemode );
+	Cvar_RegisterVariable( &vr_hand_active );
 	Cvar_RegisterVariable( &vr_hand_click );
 	Cvar_RegisterVariable( &vr_hand_stretch );
 	Cvar_RegisterVariable( &vr_hand_x );
@@ -240,6 +243,7 @@ void Host_VRInit( void )
 	Cvar_RegisterVariable( &vr_button_trigger_right_alt );
 	Cvar_RegisterVariable( &vr_superzoomed );
 	Cvar_RegisterVariable( &vr_zoomed );
+	Cvar_RegisterVariable( &vr_zoomfix );
 	Cvar_RegisterVariable( &vr_zoom_by_motion );
 }
 
@@ -300,8 +304,9 @@ void Host_VRInputFrame( void )
 
 	// Convert input data
 	bool zoomed = Cvar_VariableValue("vr_zoomed") > 0;
+	bool zoomfix = Cvar_VariableValue("vr_zoomfix") > 0;
 	bool superzoomed = Cvar_VariableValue("vr_superzoomed") > 0;
-	XrVector3f weaponEuler = XrQuaternionf_ToEulerAngles(zoomed ? hmd.orientation : weapon.orientation);
+	XrVector3f weaponEuler = XrQuaternionf_ToEulerAngles(zoomed && !zoomfix ? hmd.orientation : weapon.orientation);
 	XrVector3f handEuler = XrQuaternionf_ToEulerAngles(hand.orientation);
 	XrVector3f hmdEuler = XrQuaternionf_ToEulerAngles(hmd.orientation);
 	vec3_t hmdAngles = {hmdEuler.x, hmdEuler.y, hmdEuler.z};
@@ -335,11 +340,11 @@ void Host_VRInputFrame( void )
 			right.x = vr_input[0];
 			right.y = vr_input[1];
 		}
-		Host_VRWeaponCrosshair(zoomed);
+		Host_VRWeaponCrosshair(zoomed && !zoomfix);
 		Host_VRMotionControls(zoomed, superzoomed, handActive, hmdAngles, handPosition, hmdPosition, weaponPosition);
 		Host_VRMovementPlayer(hmdAngles, hmdPosition, weaponAngles, left.x, left.y);
-		Host_VRMovementEntity(zoomed, handPosition, hmdAngles, hmdPosition, weaponPosition);
-		Host_VRRotations(zoomed, handAngles, hmdAngles, hmdPosition, weaponAngles, right.x, right.y);
+		Host_VRMovementEntity(zoomed && !zoomfix, handPosition, hmdAngles, hmdPosition, weaponPosition);
+		Host_VRRotations(zoomed && !zoomfix, handAngles, hmdAngles, hmdPosition, weaponAngles, right.x, right.y);
 	} else {
 		// Measure player when not in game mode
 		vr_hmd_offset[2] = hmd.position.y;
@@ -378,7 +383,7 @@ bool Host_VRAdjustInput( vec3_t handAngles, vec3_t handPosition, vec3_t hmdAngle
 	bool buttonActivator2 = fabs(Cvar_VariableValue("vr_motion_activation") - 3) < 0.1f;
 	bool handClick = Cvar_VariableValue("vr_hand_click") > 0.5f;
 	bool handStretch = Cvar_VariableValue("vr_hand_stretch") > 0.5f;
-	bool handActive = ((buttonActivator1 || buttonActivator2) && handClick) || (armStretching && handStretch);
+	bool handActive = (((buttonActivator1 || buttonActivator2) && handClick) || (armStretching && handStretch));
 	if (handActive) {
 		float dirX = hmdPosition[0] - handPosition[0];
 		float dirY = hmdPosition[2] - handPosition[2];
@@ -387,6 +392,7 @@ bool Host_VRAdjustInput( vec3_t handAngles, vec3_t handPosition, vec3_t hmdAngle
 		weaponAngles[PITCH] = RAD2DEG(sin(dirZ / dir));
 		weaponAngles[YAW] = RAD2DEG(atan2(dirX, dirY));
 	}
+	Cvar_SetValue("vr_hand_active", handActive ? 1 : 0);
 
 	// Change weapon angles if throwing a grenade
 	if (Cvar_VariableValue("vr_weapon_throw_active") > 0.5f) {
@@ -882,7 +888,7 @@ void Host_VRMotionControls( bool zoomed, bool superzoomed, bool motionActive, ve
 			Cbuf_AddText( "+attack2\n" );
 			Cvar_SetValue("vr_zoom_by_motion", 1);
 			zoomRequested = true;
-		} else if (!motionActive && (zoomed || superzoomed) && (Cvar_VariableValue("vr_zoom_by_motion") > 0.5f)) {
+		} else if (!motionActive && zoomed && (Cvar_VariableValue("vr_zoom_by_motion") > 0.5f)) {
 			Cbuf_AddText( "+attack2\n" );
 			zoomRequested = true;
 		}

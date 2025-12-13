@@ -572,7 +572,7 @@ void Host_VRInit( void );
 bool Host_VRInitFrame( void );
 void Host_VRClientFrame( void );
 void Host_VRInputFrame( void );
-bool Host_VRAdjustInput(  vec3_t handAngles, vec3_t handPosition, vec3_t hmdAngles, const vec3_t hmdPosition, vec3_t weaponAngles, vec3_t weaponPosition );
+bool Host_VRAdjustInput( vec3_t handAngles, vec3_t handPosition, vec3_t hmdAngles, const vec3_t hmdPosition, vec3_t weaponAngles, vec3_t weaponPosition );
 void Host_VRButtonMap( unsigned int button, int currentButtons, int lastButtons, const char* name, bool alt );
 void Host_VRButtonMapping( bool swapped, unsigned int lbuttons, unsigned int rbuttons );
 void Host_VRBUttonMaskThumbstick( float x, float y, unsigned int* buttons );

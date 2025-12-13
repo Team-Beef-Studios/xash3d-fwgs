@@ -369,7 +369,7 @@ void R_SetupFrustum( void )
 	gEngfuncs.Cvar_SetValue("vr_player_yaw", RI.viewangles[1]);
 
 	// Use VR camera angles only when not zoomed
-	if (gEngfuncs.pfnGetCvarFloat("vr_zoomed") < 1)
+	if ((gEngfuncs.pfnGetCvarFloat("vr_zoomed") < 1) || (gEngfuncs.pfnGetCvarFloat("vr_zoomfix") > 0))
 	{
 		// VR camera
 		RI.viewangles[0] = gEngfuncs.pfnGetCvarFloat("vr_hmd_pitch");
