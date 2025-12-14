@@ -44,11 +44,11 @@ enum
 
 // fixed point stuff for real-time resampling
 #define FIX_BITS             28
-#define FIX_SCALE			 ( 1 << FIX_BITS )
-#define FIX_MASK             (( 1 << FIX_BITS ) - 1 )
-#define FIX_FLOAT( a )       ((int)(( a ) * FIX_SCALE ))
-#define FIX( a )             (((int)( a )) << FIX_BITS )
-#define FIX_INTPART( a )     (((int)( a )) >> FIX_BITS )
+#define FIX_SCALE            ( 1U << FIX_BITS )
+#define FIX_MASK             (( 1U << FIX_BITS ) - 1 )
+#define FIX_FLOAT( a )       ((uint)(( a ) * FIX_SCALE ))
+#define FIX( a )             (((uint)( a )) << FIX_BITS )
+#define FIX_INTPART( a )     (((uint)( a )) >> FIX_BITS )
 #define FIX_FRACPART( a )    (( a ) & FIX_MASK )
 
 typedef struct
@@ -299,13 +299,14 @@ static void S_PaintStereoFrom16( portable_samplepair_t *pbuf, int *volume, short
 	}
 }
 
-static void S_Mix8MonoTimeCompress( portable_samplepair_t *pbuf, int *volume, byte *pData, int inputOffset, uint rateScale, int outCount, int timecompress )
+static void S_Mix8MonoTimeCompress( portable_samplepair_t *pbuf, int *volume, byte *pData, uint inputOffset, uint rateScale, int outCount, int timecompress )
 {
 }
 
-static void S_Mix8Mono( portable_samplepair_t *pbuf, int *volume, byte *pData, int inputOffset, uint rateScale, int outCount, int timecompress )
+static void S_Mix8Mono( portable_samplepair_t *pbuf, int *volume, byte *pData, uint inputOffset, uint rateScale, int outCount, int timecompress )
 {
-	int	i, sampleIndex = 0;
+	int	i;
+	uint sampleIndex = 0;
 	uint	sampleFrac = inputOffset;
 	int	*lscale, *rscale;
 
@@ -335,9 +336,10 @@ static void S_Mix8Mono( portable_samplepair_t *pbuf, int *volume, byte *pData, i
 	}
 }
 
-static void S_Mix8Stereo( portable_samplepair_t *pbuf, int *volume, byte *pData, int inputOffset, uint rateScale, int outCount )
+static void S_Mix8Stereo( portable_samplepair_t *pbuf, int *volume, byte *pData, uint inputOffset, uint rateScale, int outCount )
 {
-	int	i, sampleIndex = 0;
+	int	i;
+	uint sampleIndex = 0;
 	uint	sampleFrac = inputOffset;
 	int	*lscale, *rscale;
 
@@ -361,9 +363,10 @@ static void S_Mix8Stereo( portable_samplepair_t *pbuf, int *volume, byte *pData,
 	}
 }
 
-static void S_Mix16Mono( portable_samplepair_t *pbuf, int *volume, short *pData, int inputOffset, uint rateScale, int outCount )
+static void S_Mix16Mono( portable_samplepair_t *pbuf, int *volume, short *pData, uint inputOffset, uint rateScale, int outCount )
 {
-	int	i, sampleIndex = 0;
+	int	i;
+	uint sampleIndex = 0;
 	uint	sampleFrac = inputOffset;
 
 	// Not using pitch shift?
@@ -383,9 +386,10 @@ static void S_Mix16Mono( portable_samplepair_t *pbuf, int *volume, short *pData,
 	}
 }
 
-static void S_Mix16Stereo( portable_samplepair_t *pbuf, int *volume, short *pData, int inputOffset, uint rateScale, int outCount )
+static void S_Mix16Stereo( portable_samplepair_t *pbuf, int *volume, short *pData, uint inputOffset, uint rateScale, int outCount )
 {
-	int	i, sampleIndex = 0;
+	int	i;
+	uint sampleIndex = 0;
 	uint	sampleFrac = inputOffset;
 
 	// Not using pitch shift?
@@ -405,7 +409,7 @@ static void S_Mix16Stereo( portable_samplepair_t *pbuf, int *volume, short *pDat
 	}
 }
 
-static void S_MixChannel( channel_t *pChannel, void *pData, int outputOffset, int inputOffset, uint fracRate, int outCount, int timecompress )
+static void S_MixChannel( channel_t *pChannel, void *pData, int outputOffset, uint inputOffset, uint fracRate, int outCount, int timecompress )
 {
 	int			pvol[CCHANVOLUMES];
 	paintbuffer_t		*ppaint = MIX_GetCurrentPaintbufferPtr();
