@@ -688,7 +688,7 @@ bool Host_VRMenuInput( bool cursorActive, bool gameMode, bool swapped, int lbutt
 	if (!hadFocus && hasFocus && keyboardShown) {
 		if( cls.key_dest == key_console )
 			Key_Console( K_ENTER );
-		else
+		else if( cls.key_dest != key_menu )
 			Key_Message( K_ENTER );
 		keyboardShown = false;
 		SDL_StopTextInput();
