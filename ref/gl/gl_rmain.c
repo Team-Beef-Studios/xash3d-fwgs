@@ -19,6 +19,7 @@ GNU General Public License for more details.
 #include "beamdef.h"
 #include "particledef.h"
 #include "entity_types.h"
+#include "pm_defs.h"
 
 
 #define IsLiquidContents( cnt )	( cnt == CONTENTS_WATER || cnt == CONTENTS_SLIME || cnt == CONTENTS_LAVA )
@@ -396,6 +397,7 @@ void R_SetupFrustum( void )
 	AngleVectors( angles, RI.pforward, RI.pright, RI.pup );
 
 	// VR camera translation
+	float scale = gEngfuncs.pfnGetCvarFloat("vr_worldscale");
 	if (gEngfuncs.pfnGetCvarFloat("vr_6dof") > 0) {
 		vec3_t fwd = {RI.vforward[0], RI.vforward[1], 0.0f};
 		vec3_t right = {RI.vright[0], RI.vright[1], 0.0f};
@@ -406,6 +408,22 @@ void R_SetupFrustum( void )
 		float dz = gEngfuncs.pfnGetCvarFloat("vr_camera_z");
 		float offsetX = right[0] * dx + fwd[0] * dy;
 		float offsetY = right[1] * dx + fwd[1] * dy;
+
+		// Wall pushback
+		if (gEngfuncs.pfnGetCvarFloat("vr_spectator") < 0.5f) {
+			vec3_t newpos;
+			float pushback = 50 / scale;
+			newpos[0] = RI.vieworg[0] - offsetX * pushback;
+			newpos[1] = RI.vieworg[1] - offsetY * pushback;
+			newpos[2] = RI.vieworg[2] + dz * pushback;
+			pmtrace_t trace = gEngfuncs.CL_TraceLine( RI.vieworg, newpos, PM_STUDIO_IGNORE );
+			if( trace.fraction != 1.0f ) {
+				offsetX = -(trace.endpos[0] - RI.vieworg[0]) / pushback;
+				offsetY = -(trace.endpos[1] - RI.vieworg[1]) / pushback;
+			}
+		}
+
+		// Apply camera offset
 		RI.vieworg[0] -= offsetX;
 		RI.vieworg[1] -= offsetY;
 		RI.vieworg[2] += dz;
@@ -415,7 +433,6 @@ void R_SetupFrustum( void )
 
 	// Workaround for glitch on the end of ducking animation
 	static vec3_t lastPos = {};
-	float scale = gEngfuncs.pfnGetCvarFloat("vr_worldscale");
 	if ((fabs(RI.vieworg[0] - lastPos[0]) < scale) &&
 		(fabs(RI.vieworg[1] - lastPos[1]) < scale) &&
 		(RI.vieworg[2] - lastPos[2] > scale / 2.0f)) {
