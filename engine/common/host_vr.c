@@ -63,6 +63,7 @@ CVAR_DEFINE_AUTO( vr_player_yaw, "0", FCVAR_MOVEVARS, "Yaw angle of the player" 
 CVAR_DEFINE_AUTO( vr_shielded, "0", FCVAR_MOVEVARS, "Player is covered by shield" );
 CVAR_DEFINE_AUTO( vr_spectator, "0", FCVAR_MOVEVARS, "Is the game in spectator mode?" );
 CVAR_DEFINE_AUTO( vr_stereo_side, "0", FCVAR_MOVEVARS, "Eye being drawn" );
+CVAR_DEFINE_AUTO( vr_vignette_amount, "0", FCVAR_MOVEVARS, "Amount of rendered vignette" );
 CVAR_DEFINE_AUTO( vr_weapon_anim, "1", FCVAR_MOVEVARS, "Disabling animations for motion controls" );
 CVAR_DEFINE_AUTO( vr_weapon_calibration_on, "0", FCVAR_MOVEVARS, "Tool to calibrate weapons" );
 CVAR_DEFINE_AUTO( vr_weapon_calibration_update, "0", FCVAR_MOVEVARS, "Information to update calibration" );
@@ -129,6 +130,7 @@ CVAR_DEFINE_AUTO( vr_msaa, "0", FCVAR_ARCHIVE, "Game rendering subpixel renderin
 CVAR_DEFINE_AUTO( vr_refreshrate, "0", FCVAR_ARCHIVE, "1=force 90hz refresh rate" );
 CVAR_DEFINE_AUTO( vr_righthand, "1", FCVAR_ARCHIVE, "Use right hand mapping" );
 CVAR_DEFINE_AUTO( vr_supersampling, "1.1", FCVAR_ARCHIVE, "Game rendering resolution" );
+CVAR_DEFINE_AUTO( vr_vignette, "0", FCVAR_ARCHIVE, "1=enable comfort vignette" );
 CVAR_DEFINE_AUTO( vr_walkdirection, "1", FCVAR_ARCHIVE, "0=direction from controller, 1=direction from HMD" );
 CVAR_DEFINE_AUTO( vr_weapon_restore, "1", FCVAR_ARCHIVE, "0=keep models/alignment, 1=restore models/alignment" );
 CVAR_DEFINE_AUTO( vr_worldscale, "30", FCVAR_ARCHIVE, "Sets the world scale for stereo separation" );
@@ -203,6 +205,8 @@ void Host_VRInit( void )
 	Cvar_RegisterVariable( &vr_weapon_y );
 	Cvar_RegisterVariable( &vr_weapon_z );
 	Cvar_RegisterVariable( &vr_supersampling );
+	Cvar_RegisterVariable( &vr_vignette );
+	Cvar_RegisterVariable( &vr_vignette_amount );
 	Cvar_RegisterVariable( &vr_walkdirection );
 	Cvar_RegisterVariable( &vr_weapon_restore );
 	Cvar_RegisterVariable( &vr_worldscale );
@@ -352,6 +356,7 @@ void Host_VRInputFrame( void )
 		// No game actions when UI is shown
 		Host_VRButtonMapping(!rightHanded, 0, 0);
 		clgame.dllFuncs.pfnMoveEvent( 0, 0 );
+		Cvar_SetValue("vr_vignette_amount", 0);
 	}
 	Host_VRHaptics( rightHanded, weaponAngles );
 }
@@ -955,12 +960,27 @@ void Host_VRMovementPlayer( vec3_t hmdAngles, vec3_t hmdPosition, vec3_t weaponA
 	currentPosition[1] = Cvar_VariableValue("vr_player_pos_y");
 	currentPosition[2] = Cvar_VariableValue("vr_player_pos_z");
 	if (VectorDistance(currentPosition, lastPosition) > scale) {
+		Cvar_SetValue("vr_vignette_amount", 1);
 		VR_Recenter(VR_GetEngine());
 		reset = true;
 	}
 
+	// Comfort vignette
+	if (Cvar_VariableValue("vr_vignette") > 0.5f) {
+		bool increase = VectorDistance(currentPosition, lastPosition) > scale * 0.1f;
+		float amount = Cvar_VariableValue("vr_vignette_amount");
+		if (increase)
+			amount = (amount + 1.0f) / 2.0f;
+		else if (amount > 0)
+			amount -= 0.005f;
+		else
+			amount = 0;
+		Cvar_SetValue("vr_vignette_amount", amount);
+	}
+
 	// Reset offset if OS recenter was called
 	if (VR_DidRecenter()) {
+		Cvar_SetValue("vr_vignette_amount", 1);
 		vr_hmd_offset[0] = 0;
 		vr_hmd_offset[1] = 0;
 		vr_hmd_offset[2] = hmdPosition[1];
@@ -1072,6 +1092,7 @@ void Host_VRRotations( bool zoomed, vec3_t handAngles, vec3_t hmdAngles, vec3_t 
 			angle *= 0.02f;
 		}
 		snapTurnStep = thumbstickX > 0 ? -angle : angle;
+		Cvar_SetValue("vr_vignette_amount", 1);
 		vr_hmd_offset[0] = -hmdPosition[0];
 		vr_hmd_offset[1] = -hmdPosition[2];
 		yaw += snapTurnStep;

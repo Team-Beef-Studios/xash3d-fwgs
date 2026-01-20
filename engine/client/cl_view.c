@@ -528,6 +528,18 @@ void V_PostRender( void )
 	ref.dllFuncs.R_AllowFog( false );
 	ref.dllFuncs.R_Set2DMode( true );
 
+	// VR vignette
+	float f = Cvar_VariableValue("vr_vignette_amount");
+	if ((Cvar_VariableValue("vr_vignette") > 0.5f) && (f > 0.5f)) {
+		static int vignette = -1;
+		if (vignette == -1)
+			vignette = ref.dllFuncs.GL_LoadTexture("sprites/vignette.png", NULL, 0, TF_NEAREST|TF_NOMIPMAP|TF_CLAMP);
+		int w = clgame.scrInfo.iWidth * 2;
+		int h = clgame.scrInfo.iHeight * 2;
+		ref.dllFuncs.GL_Bind( 0, vignette );
+		ref.dllFuncs.R_DrawStretchPic( 0, 0, w, h, (1 - f), (1 - f), f, f, vignette );
+	}
+
 	if( cls.state == ca_active && cls.signon == SIGNONS && cls.scrshot_action != scrshot_mapshot )
 	{
 		SCR_TileClear();
