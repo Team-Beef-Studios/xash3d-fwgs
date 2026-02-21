@@ -35,4 +35,5 @@ XrVector2f IN_VRGetJoystickState( int controllerIndex );
 XrPosef IN_VRGetPose( int controllerIndex );
 bool IN_VRIsActive( int controllerIndex );
 void IN_VRSetDeadzone( float value );
+void IN_VRSetSwapThumbsticks( bool swap );
 void IN_VR_Vibrate( float duration, int chan, float intensity );

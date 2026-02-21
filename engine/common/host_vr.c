@@ -124,6 +124,7 @@ CVAR_DEFINE_AUTO( vr_haptics_enable, "1", FCVAR_ARCHIVE, "Flag if haptics are en
 CVAR_DEFINE_AUTO( vr_motion_activation, "3", FCVAR_ARCHIVE, "0=disable, 1=using use button, 2=stretch arm, 3=both" );
 CVAR_DEFINE_AUTO( vr_thumbstick_deadzone_left, "0.15", FCVAR_ARCHIVE, "Deadzone of thumbstick to filter drift" );
 CVAR_DEFINE_AUTO( vr_thumbstick_deadzone_right, "0.8", FCVAR_ARCHIVE, "Deadzone of thumbstick to filter drift" );
+CVAR_DEFINE_AUTO( vr_thumbstick_swap, "0", FCVAR_ARCHIVE, "1=swap thumbsticks (left/right)" );
 CVAR_DEFINE_AUTO( vr_turn_angle, "45", FCVAR_ARCHIVE, "Angle to rotate by a thumbstick" );
 CVAR_DEFINE_AUTO( vr_turn_type, "0", FCVAR_ARCHIVE, "0 = snap turn, 1 = smooth turn" );
 CVAR_DEFINE_AUTO( vr_msaa, "0", FCVAR_ARCHIVE, "Game rendering subpixel rendering" );
@@ -185,6 +186,7 @@ void Host_VRInit( void )
 	Cvar_RegisterVariable( &vr_stereo_side );
 	Cvar_RegisterVariable( &vr_thumbstick_deadzone_left );
 	Cvar_RegisterVariable( &vr_thumbstick_deadzone_right );
+	Cvar_RegisterVariable( &vr_thumbstick_swap );
 	Cvar_RegisterVariable( &vr_turn_angle );
 	Cvar_RegisterVariable( &vr_turn_type );
 	Cvar_RegisterVariable( &vr_weapon_anim );
@@ -555,8 +557,9 @@ bool Host_VRConfig()
 		lastGameMode = gameMode;
 	}
 
-	// Update thumbstick deadzone
+	// Update thumbstick deadzone a swapping
 	IN_VRSetDeadzone(Cvar_VariableValue("vr_thumbstick_deadzone_right"));
+	IN_VRSetSwapThumbsticks(Cvar_VariableValue("vr_thumbstick_swap") > 0.5);
 
 	// Use separate right hand CVAR to not let servers overwrite it
 	Cvar_LazySet("cl_righthand", Cvar_VariableValue("vr_righthand"));

@@ -32,6 +32,7 @@ bool rActive = false;
 uint32_t lButtons = 0;
 uint32_t rButtons = 0;
 float deadZone = 0.5f;
+bool swapThumbsticks = false;
 XrActionStateVector2f moveJoystickState[2];
 
 void IN_VR_Vibrate( float duration, int channel, float intensity ) {
@@ -343,8 +344,8 @@ void IN_VRInputFrame( engine_t* engine ) {
 	if (GetActionStateBoolean(thumbstickRightClickAction).currentState) rButtons |= ovrButton_Joystick;
 
 	//thumbstick
-	moveJoystickState[0] = GetActionStateVector2(moveOnLeftJoystickAction);
-	moveJoystickState[1] = GetActionStateVector2(moveOnRightJoystickAction);
+	moveJoystickState[swapThumbsticks ? 1 : 0] = GetActionStateVector2(moveOnLeftJoystickAction);
+	moveJoystickState[swapThumbsticks ? 0 : 1] = GetActionStateVector2(moveOnRightJoystickAction);
 	if (moveJoystickState[0].currentState.x > deadZone) lButtons |= ovrButton_Right;
 	if (moveJoystickState[0].currentState.x < -deadZone) lButtons |= ovrButton_Left;
 	if (moveJoystickState[0].currentState.y > deadZone) lButtons |= ovrButton_Up;
@@ -397,4 +398,8 @@ bool IN_VRIsActive( int controllerIndex ) {
 
 void IN_VRSetDeadzone( float value ) {
 	deadZone = value;
+}
+
+void IN_VRSetSwapThumbsticks( bool swap ) {
+    swapThumbsticks = swap;
 }
