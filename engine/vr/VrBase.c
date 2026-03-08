@@ -8,17 +8,6 @@
 #include <unistd.h>
 #endif
 
-#ifdef ANDROID
-  #include <android/log.h>
-
-  #ifndef LOG_TAG
-    #define LOG_TAG "CSVR"
-  #endif
-
-  #define ALOGE(...) __android_log_print(ANDROID_LOG_ERROR, LOG_TAG, __VA_ARGS__)
-  #define ALOGW(...) __android_log_print(ANDROID_LOG_WARN,  LOG_TAG, __VA_ARGS__)
-#endif
-
 static bool vr_platform[VR_PLATFORM_MAX];
 static engine_t vr_engine;
 int vr_initialized = 0;
