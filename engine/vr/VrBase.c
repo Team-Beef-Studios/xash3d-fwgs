@@ -12,6 +12,23 @@ static bool vr_platform[VR_PLATFORM_MAX];
 static engine_t vr_engine;
 int vr_initialized = 0;
 
+static bool g_hasAndroidCreateInstanceExt = false;
+static bool g_hasPerfSettingsExt = false;
+static bool g_hasAndroidThreadSettingsExt = false;
+static bool g_hasDisplayRefreshRateExt = false;
+
+static bool XR_ExtensionSupported(const char* name,
+                                 const XrExtensionProperties* props,
+                                 uint32_t count)
+{
+	for (uint32_t i = 0; i < count; ++i) {
+		if (strcmp(props[i].extensionName, name) == 0) {
+			return true;
+		}
+	}
+	return false;
+}
+
 void VR_Init( void* system, const char* name, int version ) {
 	if (vr_initialized)
 		return;
@@ -33,24 +50,67 @@ void VR_Init( void* system, const char* name, int version ) {
 	}
 #endif
 
+	uint32_t runtimeExtCount = 0;
+	OXR(xrEnumerateInstanceExtensionProperties(NULL, 0, &runtimeExtCount, NULL));
+
+	XrExtensionProperties runtimeExtProps[256];
+	if (runtimeExtCount > (uint32_t)(sizeof(runtimeExtProps) / sizeof(runtimeExtProps[0]))) {
+		runtimeExtCount = (uint32_t)(sizeof(runtimeExtProps) / sizeof(runtimeExtProps[0]));
+	}
+	for (uint32_t i = 0; i < runtimeExtCount; ++i) {
+		memset(&runtimeExtProps[i], 0, sizeof(XrExtensionProperties));
+		runtimeExtProps[i].type = XR_TYPE_EXTENSION_PROPERTIES;
+		runtimeExtProps[i].next = NULL;
+	}
+	OXR(xrEnumerateInstanceExtensionProperties(NULL, runtimeExtCount, &runtimeExtCount, runtimeExtProps));
+
 	int extensionsCount = 0;
 	const char* extensions[32];
-	extensions[extensionsCount++] = XR_KHR_COMPOSITION_LAYER_CYLINDER_EXTENSION_NAME;
+
+	if (XR_ExtensionSupported(XR_KHR_COMPOSITION_LAYER_CYLINDER_EXTENSION_NAME, runtimeExtProps, runtimeExtCount)) {
+		extensions[extensionsCount++] = XR_KHR_COMPOSITION_LAYER_CYLINDER_EXTENSION_NAME;
+	}
+
 #ifdef ANDROID
-	extensions[extensionsCount++] = XR_KHR_OPENGL_ES_ENABLE_EXTENSION_NAME;
-	if (VR_GetPlatformFlag(VR_PLATFORM_EXTENSION_INSTANCE)) {
+	if (XR_ExtensionSupported(XR_KHR_OPENGL_ES_ENABLE_EXTENSION_NAME, runtimeExtProps, runtimeExtCount)) {
+		extensions[extensionsCount++] = XR_KHR_OPENGL_ES_ENABLE_EXTENSION_NAME;
+	} else {
+		ALOGE("OpenXR runtime does not support %s", XR_KHR_OPENGL_ES_ENABLE_EXTENSION_NAME);
+		exit(1);
+	}
+
+	g_hasAndroidCreateInstanceExt =
+			VR_GetPlatformFlag(VR_PLATFORM_EXTENSION_INSTANCE) &&
+			XR_ExtensionSupported(XR_KHR_ANDROID_CREATE_INSTANCE_EXTENSION_NAME, runtimeExtProps, runtimeExtCount);
+	if (g_hasAndroidCreateInstanceExt) {
 		extensions[extensionsCount++] = XR_KHR_ANDROID_CREATE_INSTANCE_EXTENSION_NAME;
 	}
-	if (VR_GetPlatformFlag(VR_PLATFORM_EXTENSION_PERFORMANCE)) {
+
+	g_hasPerfSettingsExt =
+			VR_GetPlatformFlag(VR_PLATFORM_EXTENSION_PERFORMANCE) &&
+			XR_ExtensionSupported(XR_EXT_PERFORMANCE_SETTINGS_EXTENSION_NAME, runtimeExtProps, runtimeExtCount);
+	if (g_hasPerfSettingsExt) {
 		extensions[extensionsCount++] = XR_EXT_PERFORMANCE_SETTINGS_EXTENSION_NAME;
-		extensions[extensionsCount++] = XR_KHR_ANDROID_THREAD_SETTINGS_EXTENSION_NAME;
 	}
-	if (VR_GetPlatformFlag(VR_PLATFORM_EXTENSION_REFRESH)) {
+
+	g_hasAndroidThreadSettingsExt =
+			VR_GetPlatformFlag(VR_PLATFORM_EXTENSION_PERFORMANCE) &&
+			XR_ExtensionSupported(XR_KHR_ANDROID_THREAD_SETTINGS_EXTENSION_NAME, runtimeExtProps, runtimeExtCount);
+	if (g_hasAndroidThreadSettingsExt) {
+		extensions[extensionsCount++] = XR_KHR_ANDROID_THREAD_SETTINGS_EXTENSION_NAME;
+	} else if (VR_GetPlatformFlag(VR_PLATFORM_EXTENSION_PERFORMANCE)) {
+		ALOGW("Runtime does not support %s, skipping it (prevents xrCreateInstance failure).",
+		      XR_KHR_ANDROID_THREAD_SETTINGS_EXTENSION_NAME);
+	}
+
+	g_hasDisplayRefreshRateExt =
+			VR_GetPlatformFlag(VR_PLATFORM_EXTENSION_REFRESH) &&
+			XR_ExtensionSupported(XR_FB_DISPLAY_REFRESH_RATE_EXTENSION_NAME, runtimeExtProps, runtimeExtCount);
+	if (g_hasDisplayRefreshRateExt) {
 		extensions[extensionsCount++] = XR_FB_DISPLAY_REFRESH_RATE_EXTENSION_NAME;
 	}
 #endif
 
-	// Create the OpenXR instance.
 	XrApplicationInfo appInfo;
 	memset(&appInfo, 0, sizeof(appInfo));
 	strcpy(appInfo.applicationName, name);
@@ -72,7 +132,7 @@ void VR_Init( void* system, const char* name, int version ) {
 
 #ifdef ANDROID
 	XrInstanceCreateInfoAndroidKHR instanceCreateInfoAndroid = {XR_TYPE_INSTANCE_CREATE_INFO_ANDROID_KHR};
-	if (VR_GetPlatformFlag(VR_PLATFORM_EXTENSION_INSTANCE)) {
+	if (g_hasAndroidCreateInstanceExt) {
 		ovrJava* java = (ovrJava*)system;
 		instanceCreateInfoAndroid.applicationVM = java->Vm;
 		instanceCreateInfoAndroid.applicationActivity = java->ActivityObject;
@@ -111,7 +171,6 @@ void VR_Init( void* system, const char* name, int version ) {
 		exit(1);
 	}
 
-	// Get the graphics requirements.
 #ifdef ANDROID
 	PFN_xrGetOpenGLESGraphicsRequirementsKHR pfnGetOpenGLESGraphicsRequirementsKHR = NULL;
 	OXR(xrGetInstanceProcAddr(
@@ -145,7 +204,6 @@ void VR_EnterVR( engine_t* engine ) {
 		return;
 	}
 
-	// Create the OpenXR Session.
 	XrSessionCreateInfo sessionCreateInfo = {};
 #ifdef ANDROID
 	XrGraphicsBindingOpenGLESAndroidKHR graphicsBindingGL = {};
@@ -167,7 +225,6 @@ void VR_EnterVR( engine_t* engine ) {
 		exit(1);
 	}
 
-	// Create a space to the first path
 	XrReferenceSpaceCreateInfo spaceCreateInfo = {};
 	spaceCreateInfo.type = XR_TYPE_REFERENCE_SPACE_CREATE_INFO;
 	spaceCreateInfo.referenceSpaceType = XR_REFERENCE_SPACE_TYPE_VIEW;
@@ -177,26 +234,42 @@ void VR_EnterVR( engine_t* engine ) {
 
 #ifdef ANDROID
 	if (VR_GetPlatformFlag(VR_PLATFORM_EXTENSION_PERFORMANCE)) {
-		XrPerfSettingsLevelEXT cpuPerfLevel = XR_PERF_SETTINGS_LEVEL_BOOST_EXT;
-		XrPerfSettingsLevelEXT gpuPerfLevel = XR_PERF_SETTINGS_LEVEL_BOOST_EXT;
+		if (g_hasPerfSettingsExt) {
+			XrPerfSettingsLevelEXT cpuPerfLevel = XR_PERF_SETTINGS_LEVEL_BOOST_EXT;
+			XrPerfSettingsLevelEXT gpuPerfLevel = XR_PERF_SETTINGS_LEVEL_BOOST_EXT;
 
-		PFN_xrPerfSettingsSetPerformanceLevelEXT pfnPerfSettingsSetPerformanceLevelEXT = NULL;
-		OXR(xrGetInstanceProcAddr(
-				engine->appState.Instance,
-				"xrPerfSettingsSetPerformanceLevelEXT",
-				(PFN_xrVoidFunction*)(&pfnPerfSettingsSetPerformanceLevelEXT)));
+			PFN_xrPerfSettingsSetPerformanceLevelEXT pfnPerfSettingsSetPerformanceLevelEXT = NULL;
+			OXR(xrGetInstanceProcAddr(
+					engine->appState.Instance,
+					"xrPerfSettingsSetPerformanceLevelEXT",
+					(PFN_xrVoidFunction*)(&pfnPerfSettingsSetPerformanceLevelEXT)));
 
-		OXR(pfnPerfSettingsSetPerformanceLevelEXT(engine->appState.Session, XR_PERF_SETTINGS_DOMAIN_CPU_EXT, cpuPerfLevel));
-		OXR(pfnPerfSettingsSetPerformanceLevelEXT(engine->appState.Session, XR_PERF_SETTINGS_DOMAIN_GPU_EXT, gpuPerfLevel));
+			if (pfnPerfSettingsSetPerformanceLevelEXT) {
+				OXR(pfnPerfSettingsSetPerformanceLevelEXT(engine->appState.Session, XR_PERF_SETTINGS_DOMAIN_CPU_EXT, cpuPerfLevel));
+				OXR(pfnPerfSettingsSetPerformanceLevelEXT(engine->appState.Session, XR_PERF_SETTINGS_DOMAIN_GPU_EXT, gpuPerfLevel));
+			} else {
+				ALOGW("xrPerfSettingsSetPerformanceLevelEXT is NULL (runtime mismatch), skipping.");
+			}
+		}
 
-		PFN_xrSetAndroidApplicationThreadKHR pfnSetAndroidApplicationThreadKHR = NULL;
-		OXR(xrGetInstanceProcAddr(
-				engine->appState.Instance,
-				"xrSetAndroidApplicationThreadKHR",
-				(PFN_xrVoidFunction*)(&pfnSetAndroidApplicationThreadKHR)));
+		if (g_hasAndroidThreadSettingsExt) {
+			PFN_xrSetAndroidApplicationThreadKHR pfnSetAndroidApplicationThreadKHR = NULL;
+			OXR(xrGetInstanceProcAddr(
+					engine->appState.Instance,
+					"xrSetAndroidApplicationThreadKHR",
+					(PFN_xrVoidFunction*)(&pfnSetAndroidApplicationThreadKHR)));
 
-		OXR(pfnSetAndroidApplicationThreadKHR(engine->appState.Session, XR_ANDROID_THREAD_TYPE_APPLICATION_MAIN_KHR, engine->appState.MainThreadTid));
-		OXR(pfnSetAndroidApplicationThreadKHR(engine->appState.Session, XR_ANDROID_THREAD_TYPE_RENDERER_MAIN_KHR, engine->appState.RenderThreadTid));
+			if (pfnSetAndroidApplicationThreadKHR) {
+				OXR(pfnSetAndroidApplicationThreadKHR(engine->appState.Session,
+				                                     XR_ANDROID_THREAD_TYPE_APPLICATION_MAIN_KHR,
+				                                     engine->appState.MainThreadTid));
+				OXR(pfnSetAndroidApplicationThreadKHR(engine->appState.Session,
+				                                     XR_ANDROID_THREAD_TYPE_RENDERER_MAIN_KHR,
+				                                     engine->appState.RenderThreadTid));
+			} else {
+				ALOGW("xrSetAndroidApplicationThreadKHR is NULL (runtime mismatch), skipping.");
+			}
+		}
 	}
 #endif
 }
@@ -204,7 +277,7 @@ void VR_EnterVR( engine_t* engine ) {
 void VR_LeaveVR( engine_t* engine ) {
 	if (engine->appState.Session) {
 		OXR(xrDestroySpace(engine->appState.HeadSpace));
-		// StageSpace is optional.
+		
 		if (engine->appState.StageSpace != XR_NULL_HANDLE) {
 			OXR(xrDestroySpace(engine->appState.StageSpace));
 		}
