@@ -99,8 +99,8 @@ void VR_Init( void* system, const char* name, int version ) {
 	if (g_hasAndroidThreadSettingsExt) {
 		extensions[extensionsCount++] = XR_KHR_ANDROID_THREAD_SETTINGS_EXTENSION_NAME;
 	} else if (VR_GetPlatformFlag(VR_PLATFORM_EXTENSION_PERFORMANCE)) {
-		ALOGW("Runtime does not support %s, skipping it (prevents xrCreateInstance failure).",
-		      XR_KHR_ANDROID_THREAD_SETTINGS_EXTENSION_NAME);
+		ALOGE("Runtime does not support %s, skipping it (prevents xrCreateInstance failure).",
+			  XR_KHR_ANDROID_THREAD_SETTINGS_EXTENSION_NAME);
 	}
 
 	g_hasDisplayRefreshRateExt =
@@ -248,7 +248,7 @@ void VR_EnterVR( engine_t* engine ) {
 				OXR(pfnPerfSettingsSetPerformanceLevelEXT(engine->appState.Session, XR_PERF_SETTINGS_DOMAIN_CPU_EXT, cpuPerfLevel));
 				OXR(pfnPerfSettingsSetPerformanceLevelEXT(engine->appState.Session, XR_PERF_SETTINGS_DOMAIN_GPU_EXT, gpuPerfLevel));
 			} else {
-				ALOGW("xrPerfSettingsSetPerformanceLevelEXT is NULL (runtime mismatch), skipping.");
+				ALOGE("xrPerfSettingsSetPerformanceLevelEXT is NULL (runtime mismatch), skipping.");
 			}
 		}
 
@@ -267,7 +267,7 @@ void VR_EnterVR( engine_t* engine ) {
 				                                     XR_ANDROID_THREAD_TYPE_RENDERER_MAIN_KHR,
 				                                     engine->appState.RenderThreadTid));
 			} else {
-				ALOGW("xrSetAndroidApplicationThreadKHR is NULL (runtime mismatch), skipping.");
+				ALOGE("xrSetAndroidApplicationThreadKHR is NULL (runtime mismatch), skipping.");
 			}
 		}
 	}
@@ -277,7 +277,7 @@ void VR_EnterVR( engine_t* engine ) {
 void VR_LeaveVR( engine_t* engine ) {
 	if (engine->appState.Session) {
 		OXR(xrDestroySpace(engine->appState.HeadSpace));
-		
+
 		if (engine->appState.StageSpace != XR_NULL_HANDLE) {
 			OXR(xrDestroySpace(engine->appState.StageSpace));
 		}
